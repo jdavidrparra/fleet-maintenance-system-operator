@@ -1,8 +1,10 @@
-name: Build and Push Docker image to ACR
+name: Build and Push to ACR
 
 on:
   push:
-    branches: [ main ]
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
 
 env:
   ACR_NAME: acrperfnaborspoceastus
@@ -10,31 +12,33 @@ env:
   ACR_REGISTRY: acrperfnaborspoceastus.azurecr.io
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
+      - uses: actions/checkout@v4
+      
+      - name: Set version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION=${GITHUB_SHA::7}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
       - name: Build Docker image
         run: |
-          docker build -t ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
-
+          docker build -t ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }} -t ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:latest -f Dockerfile .
+      
       - name: Login to ACR
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.AZURE_CLIENT_ID }}
+          password: ${{ secrets.AZURE_CLIENT_SECRET }}
+      
+      - name: Push to ACR
         run: |
-          az acr login --name ${{ env.ACR_NAME }}
-
-      - name: Push Docker image
-        run: |
-          docker push ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-
-      - name: Logout Azure
-        run: az logout
+          docker push ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          docker push ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
