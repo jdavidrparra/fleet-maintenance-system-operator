@@ -1,0 +1,39 @@
+name: Build and Push Docker image to ACR
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  ACR_NAME: acrperfnaborspoceastus
+  IMAGE_NAME: fleet/maintenance-operator
+  ACR_REGISTRY: acrperfnaborspoceastus.azurecr.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+
+      - name: Login to ACR
+        run: |
+          az acr login --name ${{ env.ACR_NAME }}
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Logout Azure
+        run: az logout
