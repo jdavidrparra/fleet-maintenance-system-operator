@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: maintenancewindow-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: maintenancewindow-operator
+  template:
+    metadata:
+      labels:
+        app: maintenancewindow-operator
+    spec:
+      serviceAccountName: maintenancewindow-operator
+      containers:
+        - name: operator
+          image: <your-operator-image>
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: KUBERNETES_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            limits:
+              cpu: 250m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
